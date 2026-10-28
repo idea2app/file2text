@@ -1,0 +1,76 @@
+{
+    "name": "@idea2app/file2text",
+    "version": "0.1.0",
+    "description": "Extract plain text or AI-generated Markdown from documents, images, and URLs",
+    "license": "LGPL-2.1-only",
+    "type": "module",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/idea2app/file2text.git"
+    },
+    "homepage": "https://github.com/idea2app/file2text#readme",
+    "bugs": {
+        "url": "https://github.com/idea2app/file2text/issues"
+    },
+    "engines": {
+        "node": ">=22.19.0"
+    },
+    "bin": {
+        "file2text": "dist/command.js"
+    },
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "source",
+        "THIRD-PARTY-NOTICES.md",
+        ".env.example"
+    ],
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "build": "tsc -p tsconfig.build.json",
+        "typecheck": "tsc --noEmit",
+        "pretest": "npm run build",
+        "test": "tsx --experimental-test-module-mocks --test test/*.test.ts",
+        "test:ocr": "tsx --test test/integration/ocr.test.ts",
+        "check-format": "prettier --check .",
+        "format": "prettier --write .",
+        "prepack": "npm run build",
+        "prepublishOnly": "npm run typecheck && npm test && npm run check-format"
+    },
+    "dependencies": {
+        "ai": "^7.0.155",
+        "commander": "^15.0.0",
+        "dotenv": "^18.0.6",
+        "fflate": "^0.8.3",
+        "file-type": "^22.2.0",
+        "js-yaml": "^4.3.2",
+        "mammoth": "^1.11.0",
+        "pdf-parse": "^2.4.5",
+        "tesseract.js": "^7.0.0",
+        "undici": "^8.11.2",
+        "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+        "xml2js": "^0.6.2"
+    },
+    "devDependencies": {
+        "@types/js-yaml": "^4.0.9",
+        "@types/node": "^22.0.0",
+        "@types/xml2js": "^0.4.14",
+        "prettier": "^3.9.9",
+        "tsx": "^4.23.15",
+        "typescript": "~6.0.3"
+    },
+    "prettier": {
+        "singleQuote": true,
+        "trailingComma": "none",
+        "arrowParens": "avoid",
+        "tabWidth": 4,
+        "printWidth": 100
+    }
+}
