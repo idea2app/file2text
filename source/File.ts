@@ -1,29 +1,30 @@
-import { readFile } from 'node:fs/promises';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { generateText, LanguageModel } from 'ai';
 import { fileTypeFromBuffer } from 'file-type';
+import fs from 'fs-extra';
+import { getTextExtractor } from 'office-text-extractor';
 import { createWorker } from 'tesseract.js';
-import { generateText, type LanguageModel } from 'ai';
-import { extractDocument } from './Office.js';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 export type FileInput = string | URL | Buffer;
 
-export function makeFileURL(path: string): URL {
+const { MEDIA_AI_MODEL } = process.env;
+
+export const makeFileURL = (path: string) =>
     // A drive letter is a local path, not a URL scheme.
-    return /^[a-z][a-z\d+.-]*:/i.test(path) && !/^[a-z]:[\\/]/i.test(path)
+    /^[a-z][a-z\d+.-]*:/i.test(path) && !/^[a-z]:[\\/]/i.test(path)
         ? new URL(path)
         : pathToFileURL(path);
-}
 
 async function loadFile(file: FileInput) {
     if (Buffer.isBuffer(file)) return { input: file };
 
-    const url = typeof file === 'string' ? makeFileURL(file) : file;
+    const { href, protocol } = typeof file === 'string' ? makeFileURL(file) : file;
 
-    if (url.protocol === 'file:') return { input: await readFile(fileURLToPath(url)) };
-    if (url.protocol !== 'http:' && url.protocol !== 'https:')
-        throw new TypeError(`Unsupported file protocol: ${url.protocol}`);
+    if (protocol === 'file:') return { input: await fs.readFile(fileURLToPath(href)) };
+    if (protocol !== 'http:' && protocol !== 'https:')
+        throw new TypeError(`Unsupported file protocol: ${protocol}`);
 
-    const response = await fetch(url);
+    const response = await fetch(href);
 
     if (!response.ok) {
         await response.body?.cancel();
@@ -35,18 +36,17 @@ async function loadFile(file: FileInput) {
     };
 }
 
-async function detectFile(input: Buffer) {
-    // Empty and short plain-text buffers are valid inputs but have no magic bytes.
-    return input.length >= 16 ? fileTypeFromBuffer(input) : undefined;
-}
+// Empty and short plain-text buffers are valid inputs but have no magic bytes.
+const detectFile = async (input: Buffer) =>
+    input.length >= 16 ? fileTypeFromBuffer(input) : undefined;
 
-export async function getFileMIME(file: FileInput): Promise<string> {
+export async function getFileMIME(file: FileInput) {
     const { input, contentType } = await loadFile(file);
 
     return (await detectFile(input))?.mime || contentType || 'text/plain';
 }
 
-export async function image2text(input: Buffer): Promise<string> {
+export async function image2text(input: Buffer) {
     const worker = await createWorker(['chi_tra', 'chi_sim', 'eng']);
 
     try {
@@ -58,13 +58,16 @@ export async function image2text(input: Buffer): Promise<string> {
     }
 }
 
+const extractor = getTextExtractor();
+
 export async function file2text(file: FileInput): Promise<string> {
     const { input, contentType } = await loadFile(file);
-    const type = await detectFile(input);
+    const { ext, mime } = (await detectFile(input)) || {};
 
-    if (type && ['docx', 'xlsx', 'pptx', 'pdf'].includes(type.ext)) return extractDocument(input);
+    if (ext && ['docx', 'xlsx', 'pptx', 'pdf'].includes(ext))
+        return extractor.extractText({ type: 'file', input });
 
-    return (type?.mime || contentType)?.startsWith('image/')
+    return (mime || contentType)?.startsWith('image/')
         ? image2text(input)
         : input.toString('utf-8');
 }
@@ -79,15 +82,15 @@ export const markdownPrompt = `请识别以下文件中的文字（可能包含�
 
 export async function file2markdown(
     file: FileInput,
-    model: LanguageModel | undefined = process.env.MEDIA_AI_MODEL
+    model: LanguageModel | undefined = MEDIA_AI_MODEL
 ): Promise<string> {
     if (!model)
         throw new Error(
             'Markdown conversion requires MEDIA_AI_MODEL or an explicit model argument.'
         );
-
     const { input, contentType } = await loadFile(file);
     const mediaType = (await detectFile(input))?.mime || contentType || 'text/plain';
+
     const { text } = await generateText({
         model,
         messages: [
@@ -100,6 +103,5 @@ export async function file2markdown(
             }
         ]
     });
-
     return text;
 }

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { after, before, mock, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { MockLanguageModelV4 } from 'ai/test';
+
 import { docx, pdf, png, pptx, xlsx } from './fixtures.js';
 
 const recognize = mock.fn(async (_input: Buffer) => ({ data: { text: '  OCR 中文  \n' } }));
@@ -13,12 +14,18 @@ const terminate = mock.fn(async () => {});
 const createWorker = mock.fn(async (..._args: unknown[]) => ({ recognize, terminate }));
 mock.module('tesseract.js', { namedExports: { createWorker } });
 
+const previousModel = process.env.MEDIA_AI_MODEL;
+delete process.env.MEDIA_AI_MODEL;
+
 const { file2text, file2markdown, getFileMIME, image2text, makeFileURL, markdownPrompt } =
     await import('../source/File.js');
+const { textualizeFile } = await import('../source/index.js');
+if (previousModel !== undefined) process.env.MEDIA_AI_MODEL = previousModel;
 
 let directory: string;
 let origin: string;
 let requests = 0;
+
 const server = createServer((request, response) => {
     requests++;
     if (request.url === '/missing') {
@@ -38,6 +45,7 @@ const server = createServer((request, response) => {
 before(async () => {
     directory = await mkdtemp(join(tmpdir(), 'file2text-'));
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+
     const address = server.address();
     assert.ok(address && typeof address !== 'string');
     origin = `http://127.0.0.1:${address.port}`;
@@ -53,9 +61,12 @@ after(async () => {
 test('local paths and URLs preserve spaces, Unicode, #, and percent signs', async () => {
     const path = join(directory, '中文 # 100%.txt');
     const text = '中文 text\n';
+
     await writeFile(path, text);
+
     assert.equal(makeFileURL(path).href, pathToFileURL(path).href);
     assert.equal(makeFileURL(origin).href, `${origin}/`);
+
     for (const input of [path, pathToFileURL(path), pathToFileURL(path).href, Buffer.from(text)])
         assert.equal(await file2text(input), text);
 });
@@ -90,7 +101,9 @@ for (const [extension, fixture, expected] of [
     test(`extracts actual ${extension.toUpperCase()} bytes, regardless of filename`, async () => {
         const input = fixture();
         const path = join(directory, `${extension}.unknown`);
+
         await writeFile(path, input);
+
         assert.ok((await file2text(input)).includes(expected));
         assert.ok((await file2text(path)).includes(expected));
     });
@@ -104,6 +117,7 @@ test('remote PDF uses magic bytes instead of generic Content-Type', async () => 
 test('OCR uses all original languages, trims output, and terminates its worker', async () => {
     const input = png();
     const previous = terminate.mock.callCount();
+
     assert.equal(await file2text(input), 'OCR 中文');
     assert.deepEqual(createWorker.mock.calls.at(-1)?.arguments[0], ['chi_tra', 'chi_sim', 'eng']);
     assert.equal(recognize.mock.calls.at(-1)?.arguments[0], input);
@@ -113,6 +127,7 @@ test('OCR uses all original languages, trims output, and terminates its worker',
 
 test('OCR errors propagate and still terminate the worker', async () => {
     const previous = terminate.mock.callCount();
+
     recognize.mock.mockImplementationOnce(async () => {
         throw new Error('recognition failed');
     });
@@ -137,13 +152,17 @@ test('Markdown passes original bytes, detected MIME, and all formatting rules to
     const input = png();
     const ai = Model();
     assert.equal(await file2markdown(input, ai), '# Converted\n\n中文');
+
     const message = ai.doGenerateCalls[0].prompt.at(-1);
     assert.equal(message?.role, 'user');
+
     const instructions = message?.content[0];
     assert.equal(instructions?.type, 'text');
     if (instructions?.type === 'text') assert.equal(instructions.text, markdownPrompt);
+
     const attachment = message?.content[1];
     assert.equal(attachment?.type, 'file');
+
     if (attachment?.type === 'file') {
         assert.equal(attachment.mediaType, 'image/png');
         assert.equal(attachment.data.type, 'data');
@@ -159,6 +178,7 @@ test('Markdown passes original bytes, detected MIME, and all formatting rules to
 test('Markdown supports local paths, file URLs, remote files, and plain-text buffers', async () => {
     const path = join(directory, 'markdown.pdf');
     await writeFile(path, pdf());
+
     for (const input of [
         path,
         pathToFileURL(path),
@@ -168,6 +188,23 @@ test('Markdown supports local paths, file URLs, remote files, and plain-text buf
         const ai = Model();
         const previous = requests;
         assert.equal(await file2markdown(input, ai), '# Converted\n\n中文');
+
+        const message = ai.doGenerateCalls[0].prompt.at(-1);
+        assert.equal(message?.role, 'user');
+        if (message?.role !== 'user') throw new Error('Expected a user message');
+
+        const attachment = message.content[1];
+        assert.equal(attachment?.type, 'file');
+
+        if (attachment?.type === 'file') {
+            assert.equal(attachment.data.type, 'data');
+
+            if (attachment.data.type === 'data')
+                assert.deepEqual(
+                    Buffer.from(attachment.data.data),
+                    Buffer.isBuffer(input) ? input : pdf()
+                );
+        }
         assert.equal(
             requests - previous,
             input instanceof URL && input.protocol === 'http:' ? 1 : 0
@@ -177,17 +214,30 @@ test('Markdown supports local paths, file URLs, remote files, and plain-text buf
 });
 
 test('Markdown requires a model and propagates AI and download errors', async () => {
-    const previous = process.env.MEDIA_AI_MODEL;
-    delete process.env.MEDIA_AI_MODEL;
-    try {
-        await assert.rejects(file2markdown(Buffer.from('text')), /MEDIA_AI_MODEL/);
-    } finally {
-        if (previous !== undefined) process.env.MEDIA_AI_MODEL = previous;
-    }
+    await assert.rejects(file2markdown(Buffer.from('text')), /MEDIA_AI_MODEL/);
     const ai = Model();
     ai.doGenerate = async () => {
         throw new Error('AI conversion failed');
     };
     await assert.rejects(file2markdown(pdf(), ai), /AI conversion failed/);
     await assert.rejects(file2markdown(`${origin}/missing`, ai), /404/);
+});
+
+test('textualizeFile reads text directly and falls back for other files', async () => {
+    const textPath = join(directory, 'input.txt');
+    const otherPath = join(directory, 'input.bin');
+    await writeFile(textPath, 'text without AI');
+    await writeFile(otherPath, 'local fallback');
+
+    const log = mock.method(console, 'error', () => {});
+
+    try {
+        assert.equal(await textualizeFile(textPath), 'text without AI');
+        assert.equal(log.mock.callCount(), 0);
+        assert.equal(await textualizeFile(otherPath), 'local fallback');
+        assert.match(String(log.mock.calls[0].arguments[0]), /MEDIA_AI_MODEL/);
+        await assert.rejects(textualizeFile(join(directory, 'missing.txt')), /ENOENT/);
+    } finally {
+        log.mock.restore();
+    }
 });

@@ -1,67 +1,56 @@
 {
     "name": "file2text",
-    "version": "0.1.0",
+    "version": "0.2.0",
+    "license": "LGPL-2.1-or-later",
+    "author": "shiy2008@gmail.com",
     "description": "Extract plain text or AI-generated Markdown from documents, images, and URLs",
-    "license": "LGPL-2.1-only",
-    "type": "module",
+    "homepage": "https://github.com/idea2app/file2text#readme",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/idea2app/file2text.git"
     },
-    "homepage": "https://github.com/idea2app/file2text#readme",
     "bugs": {
         "url": "https://github.com/idea2app/file2text/issues"
     },
+    "type": "module",
     "engines": {
         "node": ">=22.19.0"
     },
+    "files": [
+        "source",
+        "dist",
+        "README.md",
+        "LICENSE"
+    ],
     "bin": "dist/command.js",
     "exports": {
-        ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
-        }
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
     },
-    "files": [
-        "dist",
-        "THIRD-PARTY-NOTICES.md",
-        ".env.example"
-    ],
-    "publishConfig": {
-        "access": "public"
-    },
-    "scripts": {
-        "build": "pkgroll --clean-dist --srcdist source:dist --license=THIRD-PARTY-NOTICES.md",
-        "typecheck": "tsc --noEmit",
-        "pretest": "pkgroll --clean-dist --srcdist source:dist --license=THIRD-PARTY-NOTICES.md",
-        "test": "tsx --experimental-test-module-mocks --test test/*.test.ts",
-        "test:ocr": "tsx --test test/integration/ocr.test.ts",
-        "check-format": "prettier --check .",
-        "format": "prettier --write .",
-        "prepack": "pkgroll --clean-dist --srcdist source:dist --license=THIRD-PARTY-NOTICES.md",
-        "prepublishOnly": "tsc --noEmit && npm test && prettier --check ."
-    },
-    "devDependencies": {
-        "@types/js-yaml": "^4.0.9",
-        "@types/json-schema": "^7.0.15",
-        "@types/node": "^22.0.0",
-        "@types/xml2js": "^0.4.14",
+    "dependencies": {
         "ai": "^7.0.155",
         "commander-jsx": "^0.8.0",
-        "dotenv": "^18.0.6",
-        "fflate": "^0.8.3",
+        "dotenv": "^18.0.9",
         "file-type": "^22.2.0",
-        "js-yaml": "^4.3.2",
-        "mammoth": "^1.11.0",
+        "fs-extra": "^11.4.1",
+        "mime": "^4.1.2",
         "office-text-extractor": "^4.0.0",
+        "tesseract.js": "^7.0.0",
+        "undici": "^8.12.3",
+        "zod": "^4.6.7"
+    },
+    "devDependencies": {
+        "@types/fs-extra": "^11.0.4",
+        "@types/node": "^26.6.5",
+        "fflate": "^0.8.3",
+        "husky": "^9.1.7",
+        "lint-staged": "^17.6.0",
         "pkgroll": "^2.29.0",
-        "prettier": "^3.9.9",
+        "prettier": "^3.9.10",
         "tsx": "^4.23.15",
         "typescript": "~6.0.3",
-        "undici": "^8.11.2",
-        "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+        "zx": "^8.8.5"
     },
-    "packageManager": "pnpm@12.15.0",
     "prettier": {
         "singleQuote": true,
         "trailingComma": "none",
@@ -69,8 +58,16 @@
         "tabWidth": 4,
         "printWidth": 100
     },
-    "dependencies": {
-        "pdf-parse": "^2.4.5",
-        "tesseract.js": "^7.0.0"
+    "lint-staged": {
+        "*.{md,json,js,jsx,ts,tsx}": "prettier --write"
+    },
+    "scripts": {
+        "prepare": "husky",
+        "check": "lint-staged  &&  tsc --noEmit",
+        "build": "pkgroll --clean-dist --srcdist source:dist",
+        "pretest": "npm run build",
+        "test": "npm run check  &&  tsx --experimental-test-module-mocks --test test/*.test.ts",
+        "prepack": "npm run build",
+        "prepublishOnly": "npm test  &&  npm run build"
     }
 }
