@@ -1,0 +1,8 @@
+packages:
+    - .
+autoInstallPeers: false
+blockExoticSubdeps: false
+minimumReleaseAge: 0
+allowBuilds:
+    esbuild: true
+    tesseract.js: true

@@ -1,0 +1,73 @@
+{
+    "name": "file2text",
+    "version": "0.2.0",
+    "license": "LGPL-2.1-or-later",
+    "author": "shiy2008@gmail.com",
+    "description": "Extract plain text or AI-generated Markdown from documents, images, and URLs",
+    "homepage": "https://github.com/idea2app/file2text#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/idea2app/file2text.git"
+    },
+    "bugs": {
+        "url": "https://github.com/idea2app/file2text/issues"
+    },
+    "type": "module",
+    "engines": {
+        "node": ">=22.19.0"
+    },
+    "files": [
+        "source",
+        "dist",
+        "README.md",
+        "LICENSE"
+    ],
+    "bin": "dist/command.js",
+    "exports": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+    },
+    "dependencies": {
+        "ai": "^7.0.155",
+        "commander-jsx": "^0.8.0",
+        "dotenv": "^18.0.9",
+        "file-type": "^22.2.0",
+        "fs-extra": "^11.4.1",
+        "mime": "^4.1.2",
+        "office-text-extractor": "^4.0.0",
+        "tesseract.js": "^7.0.0",
+        "undici": "^8.12.3",
+        "zod": "^4.6.7"
+    },
+    "devDependencies": {
+        "@types/fs-extra": "^11.0.4",
+        "@types/node": "^26.6.5",
+        "fflate": "^0.8.3",
+        "husky": "^9.1.7",
+        "lint-staged": "^17.6.0",
+        "pkgroll": "^2.29.0",
+        "prettier": "^3.9.10",
+        "tsx": "^4.23.15",
+        "typescript": "~6.0.3",
+        "zx": "^8.8.5"
+    },
+    "prettier": {
+        "singleQuote": true,
+        "trailingComma": "none",
+        "arrowParens": "avoid",
+        "tabWidth": 4,
+        "printWidth": 100
+    },
+    "lint-staged": {
+        "*.{md,json,js,jsx,ts,tsx}": "prettier --write"
+    },
+    "scripts": {
+        "prepare": "husky",
+        "check": "lint-staged  &&  tsc --noEmit",
+        "build": "pkgroll --clean-dist --srcdist source:dist",
+        "pretest": "npm run build",
+        "test": "npm run check  &&  tsx --experimental-test-module-mocks --test test/*.test.ts",
+        "prepack": "npm run build",
+        "prepublishOnly": "npm test  &&  npm run build"
+    }
+}
