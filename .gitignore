@@ -61,8 +61,7 @@ web_modules/
 
 # Output of 'npm pack'
 *.tgz
-*.traineddata
-*.traineddata.gz
+*.traineddata*
 
 # Yarn Integrity file
 .yarn-integrity

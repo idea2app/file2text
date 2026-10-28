@@ -1,5 +1,5 @@
 node_modules
 dist
-package-lock.json
-*.traineddata
-*.traineddata.gz
+pnpm-lock.yaml
+THIRD-PARTY-NOTICES.md
+*.traineddata*

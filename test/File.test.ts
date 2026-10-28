@@ -120,20 +120,8 @@ test('OCR errors propagate and still terminate the worker', async () => {
     assert.equal(terminate.mock.callCount(), previous + 1);
 });
 
-test('OCR accepts a pre-provisioned language data directory', async () => {
-    const original = process.env.TESSDATA_PREFIX;
-    process.env.TESSDATA_PREFIX = directory;
-    try {
-        await image2text(png());
-        assert.deepEqual(createWorker.mock.calls.at(-1)?.arguments[2], { langPath: directory });
-    } finally {
-        if (original === undefined) delete process.env.TESSDATA_PREFIX;
-        else process.env.TESSDATA_PREFIX = original;
-    }
-});
-
-function model() {
-    return new MockLanguageModelV4({
+const Model = () =>
+    new MockLanguageModelV4({
         doGenerate: {
             content: [{ type: 'text', text: '# Converted\n\n中文' }],
             finishReason: { unified: 'stop', raw: 'stop' },
@@ -144,11 +132,10 @@ function model() {
             warnings: []
         }
     });
-}
 
 test('Markdown passes original bytes, detected MIME, and all formatting rules to AI', async () => {
     const input = png();
-    const ai = model();
+    const ai = Model();
     assert.equal(await file2markdown(input, ai), '# Converted\n\n中文');
     const message = ai.doGenerateCalls[0].prompt.at(-1);
     assert.equal(message?.role, 'user');
@@ -178,7 +165,7 @@ test('Markdown supports local paths, file URLs, remote files, and plain-text buf
         new URL(`${origin}/pdf`),
         Buffer.from('text')
     ]) {
-        const ai = model();
+        const ai = Model();
         const previous = requests;
         assert.equal(await file2markdown(input, ai), '# Converted\n\n中文');
         assert.equal(
@@ -197,7 +184,7 @@ test('Markdown requires a model and propagates AI and download errors', async ()
     } finally {
         if (previous !== undefined) process.env.MEDIA_AI_MODEL = previous;
     }
-    const ai = model();
+    const ai = Model();
     ai.doGenerate = async () => {
         throw new Error('AI conversion failed');
     };

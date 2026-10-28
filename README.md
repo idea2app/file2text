@@ -1,24 +1,24 @@
 # file2text
 
-将本地文件、HTTP(S) URL 或标准输入转换为纯文本或 Markdown 的开源 CLI 和 TypeScript 库。
+An open-source CLI and TypeScript library for extracting text or converting local files and HTTP(S) URLs to Markdown.
 
-提取能力移植自 [work-counter 的 File.ts](https://github.com/idea2app/work-counter/blob/48dfb1ca2132d057969740c9479cd4b5b304fcc5/source/utility/File.ts#L57-L115)，保留 `file2text`、`file2markdown` 及其依赖的 OCR、MIME 检测和多模态提示词。许可证为 [LGPL-2.1](LICENSE)。
+The extraction API is based on [`file2text` and `file2markdown`](https://github.com/idea2app/work-counter/blob/48dfb1ca2132d057969740c9479cd4b5b304fcc5/source/utility/File.ts#L57-L115) from work-counter, including OCR, MIME detection, and the multimodal prompt. Licensed under [LGPL-2.1](LICENSE).
 
-## 安装
+## Installation
 
-需要 **Node.js >= 22.19**，无需 Python、LibreOffice 或系统 Tesseract。
+Requires **Node.js >= 22.19**. Python, LibreOffice, and system Tesseract are not required.
 
 ```sh
-npm install -g @idea2app/file2text
+npm install -g file2text
 file2text --help
 ```
 
-也可使用 `npx @idea2app/file2text <file>`，或从源码安装：
+You can also run it with `npx file2text <file>`, or install from source:
 
 ```sh
-npm ci
-npm run build
-npm link
+pnpm install
+pnpm run build
+pnpm link --global
 ```
 
 ## CLI
@@ -28,35 +28,34 @@ file2text report.pdf
 file2text ./document.docx -o document.txt
 file2text 'https://example.com/report.pdf' -o report.txt
 file2text 'file:///path/to/document.txt'
-cat document.txt | file2text -
 file2text scan.png --format markdown --model google/gemini-2.5-flash -o scan.md
 ```
 
-默认 `--format text`，不需要 AI 密钥：DOCX、XLSX、PPTX、PDF 使用从 `office-text-extractor` 移植的适配层，分别接入 Mammoth、SheetJS、XML 解析及 pdf-parse；图片使用 Tesseract.js 识别繁体中文、简体中文和英文；其他输入按 UTF-8 读取。使用文件内容而非扩展名识别格式，空文件也可处理。旧版 DOC/XLS/PPT、音视频及其他二进制格式不在本地提取支持范围内。扫描版 PDF 的图片不会由本地 PDF 提取器执行 OCR，请使用支持该文件类型的多模态模型转 Markdown。
+Standard input is not currently supported.
 
-`--format markdown` 使用 AI SDK 的多模态文件输入，保留忽略水印、中文标点、Markdown 表格、Mermaid 流程图、LaTeX 公式及语义化排版规则。支持的格式、文件大小和效果取决于所选模型；AI 转换会将文件内容发送给服务商并可能产生费用。失败时明确报错，**不会悄悄退回纯文本**。
+When `MEDIA_AI_MODEL` or `--model` is configured, the CLI tries AI Markdown conversion by default and falls back to local text extraction if AI conversion fails. Without a configured model, it uses local text extraction. Use `--format text` to explicitly select local extraction or `--format markdown` to request AI conversion.
 
-结果原样写到 stdout（不追加换行）或 `--output` 指定文件；错误写到 stderr，退出码为 1。输出文件已存在时会覆盖。路径含空格时请加引号，以 `-` 开头的文件名可写成 `./-name`。
+Local extraction supports DOCX, XLSX, PPTX, and PDF through `office-text-extractor`; images are recognized by Tesseract.js in Traditional Chinese, Simplified Chinese, and English. Other inputs are read as UTF-8. File contents, not extensions, determine the format, and empty files are supported. Legacy DOC/XLS/PPT, audio, video, and other binary formats are not supported for local extraction. Scanned PDF pages are not OCR-processed locally; use a multimodal model for those documents.
 
-## 配置
+Markdown conversion sends the input file to the selected AI provider and may incur costs. Supported file types, file size limits, and results depend on the model.
 
-CLI 自动读取当前工作目录的 `.env`，已存在的环境变量优先。可复制 `.env.example`：
+Results are written unchanged to stdout (without an added newline) or to the file specified with `--output`; errors go to stderr and return exit code 1. Existing output files are overwritten. Quote paths containing spaces; prefix a path beginning with `-` with `./`.
 
-| 变量                 | 用途                                                                          |
-| -------------------- | ----------------------------------------------------------------------------- |
-| `MEDIA_AI_MODEL`     | Markdown 默认模型，AI Gateway 的 `provider/model` 格式；也可用 `--model` 覆盖 |
-| `AI_GATEWAY_API_KEY` | Markdown 使用的 Vercel AI Gateway 密钥；纯文本模式无需此项                    |
-| `HTTPS_PROXY`        | HTTPS 下载和 AI 请求代理                                                      |
-| `HTTP_PROXY`         | HTTP 下载代理                                                                 |
-| `NO_PROXY`           | 不走代理的主机，例如 `localhost,127.0.0.1`                                    |
-| `TESSDATA_PREFIX`    | 可选的 OCR 语言数据目录或 URL，包含 `chi_tra/chi_sim/eng.traineddata.gz`      |
+## Configuration
 
-OCR 首次运行会下载语言模型并在当前目录缓存，需要网络及目录写入权限。离线运行请提前缓存这三个语言包，或设置 `TESSDATA_PREFIX` 指向本地语言包目录。HTTP(S) 和 AI 请求使用环境代理；OCR 语言包由 Tesseract.js 自行下载，受限网络下建议预置本地语言包。
+The CLI loads `.env` from the current working directory. Existing environment variables take precedence. Copy `.env.example` and set:
 
-## 库 API
+| Variable             | Purpose                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------ |
+| `MEDIA_AI_MODEL`     | Default Markdown model in AI Gateway `provider/model` format; `--model` overrides it |
+| `AI_GATEWAY_API_KEY` | Vercel AI Gateway key for Markdown conversion; not needed for local text extraction  |
+
+OCR language data is downloaded and cached automatically on first use, so first-time OCR requires internet access and write permissions. The CLI honors standard HTTP(S) proxy environment settings. The library does not load `.env` or modify global proxy settings.
+
+## Library API
 
 ```ts
-import { file2text, file2markdown, image2text } from '@idea2app/file2text';
+import { file2text, file2markdown, image2text } from 'file2text';
 
 const text = await file2text('./report.pdf');
 const remote = await file2text(new URL('https://example.com/report.pdf'));
@@ -64,21 +63,19 @@ const ocr = await image2text(imageBuffer);
 const markdown = await file2markdown(pdfBuffer, 'google/gemini-2.5-flash');
 ```
 
-`file2text`、`file2markdown`、`getFileMIME` 接受本地路径、`file:`/HTTP(S) URL（字符串或 `URL`）或 `Buffer`；`image2text` 接受 `Buffer`。同时导出 `makeFileURL` 和 `FileInput` 类型。`file2markdown` 第二个参数也可传 AI SDK 的 `LanguageModel` 实例，使用自行安装的模型 provider；省略时读取 `MEDIA_AI_MODEL`。库不自动加载 `.env` 或修改全局代理，可由调用方配置。远程文件下载后复用内容做 MIME 检测和转换，避免重复请求及依赖远端 HEAD 支持。
+`file2text`, `file2markdown`, and `getFileMIME` accept local paths, `file:`/HTTP(S) URLs (strings or `URL` objects), or `Buffer` values. `image2text` accepts a `Buffer`. `makeFileURL`, `FileInput`, and the `office-text-extractor` API are also exported. The second `file2markdown` argument can be an AI SDK `LanguageModel`; omit it to use `MEDIA_AI_MODEL`. Remote files are fetched once and their content is reused for MIME detection and conversion.
 
-## 开发与发布
+## Development and publishing
 
 ```sh
-npm ci
-npm run typecheck
-npm run build
-npm test
-npm run check-format
-npm pack --dry-run
+pnpm install
+pnpm run typecheck
+pnpm run build
+pnpm test
+pnpm run check-format
+pnpm pack --dry-run
 ```
 
-CI 在 Node.js 22、24、26 上运行。测试使用本地 HTTP 服务和模拟 AI/OCR，不需要密钥或联网下载语言模型。`npm run build` 生成 ESM、类型声明和带 shebang 的 CLI，`npm pack` 自动构建。
+CI runs on Node.js 22, 24, and 26. Tests use a local HTTP server and mock AI/OCR, and do not require credentials or network access for OCR language data. `pnpm run build` creates bundled ESM, type declarations, and the executable CLI; `pnpm pack` builds automatically. `pnpm run test:ocr` separately runs a real OCR worker and needs cached language data or internet access to download it.
 
-`npm run test:ocr` 另行启动真实 OCR worker，识别测试生成的 PNG；需要已缓存的语言模型或允许首次下载的网络。Office 适配层直接依赖安全修复版的底层库，避免上游封装固定的旧版依赖；归属及许可见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。SheetJS 沿用上游的官方 CDN 发布包，安装时需要能访问 `cdn.sheetjs.com`。
-
-发布前更新 `package.json` 版本并提交锁文件，然后推送匹配的 `v<version>` 标签。发布工作流使用 npm Trusted Publishing/OIDC 和 provenance；维护者需先在 npm 为 `@idea2app/file2text` 配置此仓库的 `publish.yml` 为 trusted publisher（首次发布可手动执行 `npm publish --access public`）。仓库中不存储 API 密钥。
+The Office extraction package is bundled into the output; third-party license details are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). SheetJS is installed from its official CDN package during development. Publishing has not been performed; configure npm Trusted Publishing for this repository before using the release workflow. The package can also be published manually with `npm publish --access public`. No API keys are stored in the repository.

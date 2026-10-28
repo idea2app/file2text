@@ -3,10 +3,13 @@
         "target": "ES2022",
         "module": "NodeNext",
         "moduleResolution": "NodeNext",
+        "jsx": "react-jsx",
+        "jsxImportSource": "commander-jsx",
+        "resolveJsonModule": true,
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
         "types": ["node"]
     },
-    "include": ["source/**/*.ts", "test/**/*.ts"]
+    "include": ["source/**/*", "test/**/*.ts"]
 }

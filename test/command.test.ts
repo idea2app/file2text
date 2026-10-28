@@ -17,12 +17,17 @@ after(async () => {
     await rm(directory, { recursive: true, force: true });
 });
 
-function run(args: string[], input?: string) {
+function run(args: string[], input?: string, environment: Record<string, string> = {}) {
     return new Promise<{ code: number | null; stdout: string; stderr: string }>(
         (resolve, reject) => {
             const child = spawn(process.execPath, [command, ...args], {
                 cwd: directory,
-                env: { ...process.env, MEDIA_AI_MODEL: '', DOTENV_CONFIG_QUIET: 'true' }
+                env: {
+                    ...process.env,
+                    MEDIA_AI_MODEL: '',
+                    DOTENV_CONFIG_QUIET: 'true',
+                    ...environment
+                }
             });
             let stdout = '';
             let stderr = '';
@@ -47,16 +52,14 @@ test('help and version are available from the built executable', async () => {
     assert.equal(version.stdout.trim(), metadata.version);
 });
 
-test('CLI reads stdin and writes only the exact converted text', async () => {
-    assert.deepEqual(await run(['-'], '中文 text\n'), {
-        code: 0,
-        stdout: '中文 text\n',
-        stderr: ''
-    });
-    assert.equal((await run(['-'], '')).stdout, '');
+test('CLI does not read standard input', async () => {
+    const result = await run(['-'], '中文 text\n');
+    assert.equal(result.code, 1);
+    assert.equal(result.stdout, '');
+    assert.notEqual(result.stderr, '');
 });
 
-test('CLI extracts real Office files and writes --output', async () => {
+test('CLI extracts real Office files and writes -o output', async () => {
     const path = join(directory, 'input.docx');
     const output = join(directory, 'output.txt');
     await writeFile(path, docx());
@@ -64,6 +67,14 @@ test('CLI extracts real Office files and writes --output', async () => {
     assert.equal(result.code, 0, result.stderr);
     assert.equal(result.stdout, '');
     assert.match(await readFile(output, 'utf-8'), /Hello DOCX 中文/);
+});
+
+test('CLI tries AI by default when configured and falls back to local text', async () => {
+    const path = join(directory, 'input.txt');
+    await writeFile(path, 'plain text fallback');
+    const result = await run([path], undefined, { MEDIA_AI_MODEL: 'invalid model' });
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.stdout, 'plain text fallback');
 });
 
 test('CLI exits nonzero without success-shaped output on invalid input', async () => {

@@ -47,12 +47,7 @@ export async function getFileMIME(file: FileInput): Promise<string> {
 }
 
 export async function image2text(input: Buffer): Promise<string> {
-    const langPath = process.env.TESSDATA_PREFIX;
-    const worker = await createWorker(
-        ['chi_tra', 'chi_sim', 'eng'],
-        undefined,
-        langPath ? { langPath } : undefined
-    );
+    const worker = await createWorker(['chi_tra', 'chi_sim', 'eng']);
 
     try {
         const { data } = await worker.recognize(input);
@@ -67,8 +62,7 @@ export async function file2text(file: FileInput): Promise<string> {
     const { input, contentType } = await loadFile(file);
     const type = await detectFile(input);
 
-    if (type && ['docx', 'xlsx', 'pptx', 'pdf'].includes(type.ext))
-        return extractDocument(input, type.ext);
+    if (type && ['docx', 'xlsx', 'pptx', 'pdf'].includes(type.ext)) return extractDocument(input);
 
     return (type?.mime || contentType)?.startsWith('image/')
         ? image2text(input)
